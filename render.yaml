@@ -1,0 +1,45 @@
+# Render Blueprint — Pulsefolio (free tier)
+# Dashboard → New → Blueprint → connect GitHub repo → apply.
+
+databases:
+  - name: pulsefolio-db
+    plan: free
+    databaseName: pulsefolio
+    user: pulsefolio
+
+services:
+  - type: web
+    name: pulsefolio-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./infra/docker/Dockerfile.api
+    dockerContext: .
+    dockerCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pulsefolio-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: AI_PROVIDER
+        value: rules
+      - key: CORS_ORIGINS
+        value: https://pulsefolio-web.onrender.com,http://localhost:3000
+      - key: PYTHON_VERSION
+        value: "3.12"
+
+  - type: web
+    name: pulsefolio-web
+    runtime: node
+    plan: free
+    rootDir: apps/web
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://pulsefolio-api.onrender.com

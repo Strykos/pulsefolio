@@ -1,0 +1,11 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+COPY services/api/requirements.txt ./api-requirements.txt
+COPY services/worker/requirements.txt ./worker-requirements.txt
+RUN pip install --no-cache-dir -r api-requirements.txt -r worker-requirements.txt
+COPY services/api/ ./api/
+COPY services/worker/ ./worker/
+
+ENV PYTHONPATH=/app/api
+CMD ["python", "worker/main.py"]

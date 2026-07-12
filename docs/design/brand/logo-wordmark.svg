@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 48" fill="none">
+  <circle cx="24" cy="24" r="24" fill="#0D0F14"/>
+  <path d="M8 24 L14 24 L17 18 L20 30 L23 16 L26 24 L29 21 L32 24 L38 24" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="56" y="32" font-family="Inter, system-ui, sans-serif" font-size="24" font-weight="600">
+    <tspan fill="#00D4AA">Pulse</tspan><tspan fill="#FFFFFF">folio</tspan>
+  </text>
+  <defs>
+    <linearGradient id="g" x1="8" y1="24" x2="38" y2="24">
+      <stop offset="0%" stop-color="#00D4AA"/>
+      <stop offset="100%" stop-color="#4A9EFF"/>
+    </linearGradient>
+  </defs>
+</svg>

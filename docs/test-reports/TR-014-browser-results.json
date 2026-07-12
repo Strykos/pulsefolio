@@ -1,0 +1,112 @@
+[
+  {
+    "test": "login_redirect",
+    "result": "PASS",
+    "detail": "url=http://localhost:3000/dashboard"
+  },
+  {
+    "test": "route_/",
+    "result": "PASS",
+    "detail": "HTTP 200, ISE=false",
+    "route": "/",
+    "file": "TR-014-home-1440x900.png",
+    "hasDemo124": false,
+    "hasDemoBanner": false,
+    "hasLive189k": true,
+    "hasLlama70B": false,
+    "engineModel": null
+  },
+  {
+    "test": "route_/dashboard",
+    "result": "PASS",
+    "detail": "HTTP 200, ISE=false",
+    "route": "/dashboard",
+    "file": "TR-014-dashboard-1440x900.png",
+    "hasDemo124": false,
+    "hasDemoBanner": false,
+    "hasLive189k": true,
+    "hasLlama70B": false,
+    "engineModel": null
+  },
+  {
+    "test": "route_/decision",
+    "result": "PASS",
+    "detail": "HTTP 200, ISE=false",
+    "route": "/decision",
+    "file": "TR-014-decision-1440x900.png",
+    "hasDemo124": false,
+    "hasDemoBanner": false,
+    "hasLive189k": true,
+    "hasLlama70B": false,
+    "engineModel": "hybrid · qwen3:4b"
+  },
+  {
+    "test": "route_/portfolio",
+    "result": "PASS",
+    "detail": "HTTP 200, ISE=false",
+    "route": "/portfolio",
+    "file": "TR-014-portfolio-1440x900.png",
+    "hasDemo124": false,
+    "hasDemoBanner": false,
+    "hasLive189k": false,
+    "hasLlama70B": false,
+    "engineModel": null
+  },
+  {
+    "test": "route_/trades",
+    "result": "PASS",
+    "detail": "HTTP 200, ISE=false",
+    "route": "/trades",
+    "file": "TR-014-trades-1440x900.png",
+    "hasDemo124": false,
+    "hasDemoBanner": false,
+    "hasLive189k": false,
+    "hasLlama70B": false,
+    "engineModel": null
+  },
+  {
+    "test": "route_/insights",
+    "result": "PASS",
+    "detail": "HTTP 200, ISE=false",
+    "route": "/insights",
+    "file": "TR-014-insights-1440x900.png",
+    "hasDemo124": false,
+    "hasDemoBanner": false,
+    "hasLive189k": false,
+    "hasLlama70B": false,
+    "engineModel": null
+  },
+  {
+    "test": "route_/settings",
+    "result": "PASS",
+    "detail": "HTTP 200, ISE=false",
+    "route": "/settings",
+    "file": "TR-014-settings-1440x900.png",
+    "hasDemo124": false,
+    "hasDemoBanner": false,
+    "hasLive189k": false,
+    "hasLlama70B": false,
+    "engineModel": null
+  },
+  {
+    "test": "flow_generate",
+    "result": "PARTIAL",
+    "detail": "buttons=1D|1W|1M|3M|Quick approve"
+  },
+  {
+    "test": "flow_approve",
+    "result": "PASS",
+    "detail": "approve clicked",
+    "hasSuccess": false
+  },
+  {
+    "test": "flow_settings",
+    "result": "PASS",
+    "detail": "risk profile toggled"
+  },
+  {
+    "test": "model_branding",
+    "result": "PASS",
+    "detail": "hybrid · qwen3:4b"
+  }
+]

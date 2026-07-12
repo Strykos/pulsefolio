@@ -1,0 +1,10 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/decision/page": "/decision",
+  "/portfolio/page": "/portfolio",
+  "/dashboard/page": "/dashboard",
+  "/settings/page": "/settings",
+  "/page": "/",
+  "/trades/page": "/trades",
+  "/insights/page": "/insights"
+}

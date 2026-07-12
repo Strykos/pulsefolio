@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-card-border;
+  }
+
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-bg text-text-primary font-sans;
+    font-feature-settings: "tnum" 1;
+  }
+
+  :root {
+    --color-bg: #080c10;
+    --color-surface: #0b1015;
+    --color-surface-elevated: #111720;
+    --color-text-primary: #f2f4f5;
+    --color-text-muted: #89919e;
+    --color-gain: #00d4aa;
+    --color-loss: #e94b54;
+    --color-accent: #00d4aa;
+    --color-accent-blue: #2f8ff0;
+    --color-accent-purple: #8047d9;
+    --color-accent-amber: #e7ae39;
+    --color-pulse-glow: rgba(0, 212, 170, 0.14);
+    --color-chart-grid: #222a35;
+    --color-card-border: #222a35;
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+    --spacing-lg: 16px;
+    --spacing-xl: 24px;
+    --spacing-2xl: 32px;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --ease-spring: cubic-bezier(0.34, 1.2, 0.64, 1);
+    --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    --duration-fast: 150ms;
+    --duration-normal: 300ms;
+    --duration-slow: 600ms;
+  }
+
+  [data-theme="terminal"] body {
+    font-family: var(--font-mono), ui-monospace, monospace;
+  }
+}
+
+@layer utilities {
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .obs-theme {
+    --obs-bg: #080c10;
+    --obs-main: #0b1015;
+    --obs-card: #111720;
+    --obs-raised: #151b24;
+    --obs-border: #222a35;
+    --obs-teal: #00d4aa;
+    --obs-blue: #2f8ff0;
+    --obs-purple: #8047d9;
+    --obs-amber: #e7ae39;
+    --obs-text: #f2f4f5;
+    --obs-muted: #89919e;
+  }
+
+  .obs-theme .text-obs-text { color: var(--obs-text); }
+  .obs-theme .text-obs-muted { color: var(--obs-muted); }
+  .obs-theme .text-obs-teal { color: var(--obs-teal); }
+  .obs-theme .text-obs-amber { color: var(--obs-amber); }
+  .obs-theme .bg-obs-main { background-color: var(--obs-main); }
+  .obs-theme .bg-obs-card { background-color: var(--obs-card); }
+  .obs-theme .bg-obs-raised { background-color: var(--obs-raised); }
+  .obs-theme .border-obs-border { border-color: var(--obs-border); }
+
+  .observatory-grid {
+    background-image:
+      linear-gradient(rgba(34, 42, 53, 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34, 42, 53, 0.35) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

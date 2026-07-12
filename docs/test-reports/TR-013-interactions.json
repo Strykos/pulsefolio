@@ -1,0 +1,28 @@
+[
+  {
+    "test": "E1 dashboard",
+    "dashValue": "$189,393",
+    "refreshClicked": null,
+    "hasSuccessToast": true
+  },
+  {
+    "test": "E1 open review",
+    "openReviewClicked": null,
+    "url": "http://localhost:3000/dashboard"
+  },
+  {
+    "test": "E2 decision approve",
+    "approveClicked": "Approve paper tradeExecute rebalance in paper",
+    "hasUserMessage": true
+  },
+  {
+    "test": "E4 trades approve",
+    "tradeApproveClicked": "Approve",
+    "hasMessage": true
+  },
+  {
+    "test": "E6 settings risk",
+    "growthClicked": "growth",
+    "growthPersisted": true
+  }
+]

@@ -1,0 +1,14 @@
+name: Deploy Web
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Vercel
+        run: echo "Configure VERCEL_TOKEN and VERCEL_ORG_ID secrets for production deploy"
+        # vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}

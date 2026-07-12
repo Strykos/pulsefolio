@@ -1,0 +1,9 @@
+{
+  "name": "@pulsefolio/design-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./base": "./base.json",
+    "./themes/*": "./themes/*.json"
+  }
+}

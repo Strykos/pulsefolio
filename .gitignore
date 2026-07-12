@@ -1,0 +1,20 @@
+# Pulsefolio
+
+node_modules/
+# Pulsefolio
+
+node_modules/
+.cursor/
+.next/
+dist/
+*.db
+.env
+.env.local
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+*.xcuserstate
+DerivedData/
+.tools/
+apps/ios/build/

@@ -1,0 +1,18 @@
+{
+  "id": "midnight",
+  "name": "Midnight",
+  "mood": "Premium fintech, focused",
+  "colors": {
+    "bg": "#080C10",
+    "surface": "#0B1015",
+    "surfaceElevated": "#111720",
+    "textPrimary": "#F2F4F5",
+    "textMuted": "#89919E",
+    "gain": "#00D4AA",
+    "loss": "#E94B54",
+    "accent": "#00D4AA",
+    "pulseGlow": "rgba(0, 212, 170, 0.14)",
+    "chartGrid": "#222A35",
+    "cardBorder": "#222A35"
+  }
+}

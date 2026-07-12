@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r services/api/requirements.txt pytest httpx
+      - run: pytest services/api/tests -q
+        env:
+          DATABASE_URL: sqlite:///./test.db
+          JWT_SECRET: test-secret
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: cd apps/web && npm ci && npm run lint && npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000

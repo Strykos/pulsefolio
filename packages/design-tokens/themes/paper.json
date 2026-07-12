@@ -1,0 +1,18 @@
+{
+  "id": "paper",
+  "name": "Paper",
+  "mood": "Clean, daytime, approachable",
+  "colors": {
+    "bg": "#F5F6FA",
+    "surface": "#FFFFFF",
+    "surfaceElevated": "#FFFFFF",
+    "textPrimary": "#1A1D26",
+    "textMuted": "#6B7280",
+    "gain": "#059669",
+    "loss": "#DC2626",
+    "accent": "#4A9EFF",
+    "pulseGlow": "rgba(74, 158, 255, 0.2)",
+    "chartGrid": "#E5E7EB",
+    "cardBorder": "#E5E7EB"
+  }
+}

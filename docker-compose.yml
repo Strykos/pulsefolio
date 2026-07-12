@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pulsefolio
+      POSTGRES_PASSWORD: pulsefolio
+      POSTGRES_DB: pulsefolio
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://pulsefolio:pulsefolio@postgres:5432/pulsefolio
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-secret-change-in-prod
+    depends_on:
+      - postgres
+      - redis
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+    environment:
+      DATABASE_URL: postgresql://pulsefolio:pulsefolio@postgres:5432/pulsefolio
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+      - api
+
+volumes:
+  pgdata:

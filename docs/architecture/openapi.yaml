@@ -1,0 +1,376 @@
+openapi: 3.1.0
+info:
+  title: Pulsefolio API
+  version: 0.1.0
+  description: Paper-trading portfolio simulation API with AI recommendations and risk engine.
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development
+tags:
+  - name: auth
+  - name: portfolios
+  - name: trades
+  - name: ai
+  - name: settings
+  - name: stream
+  - name: health
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Register with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserRegister"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserLogin"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: OK
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Revoke refresh token
+      responses:
+        "204":
+          description: No Content
+  /auth/me:
+    get:
+      tags: [auth]
+      security: [{ bearerAuth: [] }]
+      summary: Current user
+      responses:
+        "200":
+          description: OK
+  /portfolios:
+    get:
+      tags: [portfolios]
+      security: [{ bearerAuth: [] }]
+      summary: List portfolios
+      responses:
+        "200":
+          description: OK
+    post:
+      tags: [portfolios]
+      security: [{ bearerAuth: [] }]
+      summary: Create portfolio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortfolioCreate"
+      responses:
+        "201":
+          description: Created
+  /portfolios/{portfolio_id}:
+    get:
+      tags: [portfolios]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/portfolioId"
+      responses:
+        "200":
+          description: OK
+    patch:
+      tags: [portfolios]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/portfolioId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortfolioUpdate"
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags: [portfolios]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/portfolioId"
+      responses:
+        "204":
+          description: No Content
+  /portfolios/{portfolio_id}/risk:
+    get:
+      tags: [portfolios]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/portfolioId"
+      responses:
+        "200":
+          description: Risk assessment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskAssessment"
+  /trades:
+    get:
+      tags: [trades]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: portfolio_id
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/TradeStatus" }
+      responses:
+        "200":
+          description: OK
+    post:
+      tags: [trades]
+      security: [{ bearerAuth: [] }]
+      summary: Create trade (manual or auto)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TradeCreate"
+      responses:
+        "201":
+          description: Created
+  /trades/{trade_id}/approve:
+    post:
+      tags: [trades]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/tradeId"
+      responses:
+        "200":
+          description: Executed
+  /trades/{trade_id}/reject:
+    post:
+      tags: [trades]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/tradeId"
+      responses:
+        "200":
+          description: Rejected
+  /ai/recommendations:
+    get:
+      tags: [ai]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+    post:
+      tags: [ai]
+      security: [{ bearerAuth: [] }]
+      summary: Generate rule-based AI recommendation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AIRecommendationRequest"
+      responses:
+        "201":
+          description: Created
+  /ai/recommendations/{recommendation_id}/approve:
+    post:
+      tags: [ai]
+      security: [{ bearerAuth: [] }]
+      summary: Approve recommendation and create trade
+      responses:
+        "201":
+          description: Trade created
+  /ai/recommendations/{recommendation_id}/dismiss:
+    post:
+      tags: [ai]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Dismissed
+  /settings:
+    get:
+      tags: [settings]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: OK
+    patch:
+      tags: [settings]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Updated
+  /market/prices:
+    get:
+      tags: [stream]
+      summary: Mock market prices
+      responses:
+        "200":
+          description: OK
+  /decisions:
+    get:
+      tags: [stream]
+      security: [{ bearerAuth: [] }]
+      summary: Immutable decision audit log
+      responses:
+        "200":
+          description: OK
+  /stream:
+    get:
+      tags: [stream]
+      summary: WebSocket hub
+      description: |
+        Events: price.tick, portfolio.update, trade.executed,
+        ai.recommendation, risk.alert, worker.heartbeat
+      responses:
+        "101":
+          description: Switching Protocols
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    portfolioId:
+      name: portfolio_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    tradeId:
+      name: trade_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    UserRegister:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+    UserLogin:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    TokenResponse:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        token_type: { type: string, default: bearer }
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: { type: string }
+    PortfolioCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        target_allocations:
+          type: array
+          items:
+            type: object
+            properties:
+              asset_class:
+                type: string
+                enum: [stock, etf, bond, crypto, commodity, cash]
+              target_percent: { type: number }
+    PortfolioUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        target_allocations:
+          type: array
+          items:
+            type: object
+    TradeCreate:
+      type: object
+      required: [portfolio_id, symbol, side, quantity]
+      properties:
+        portfolio_id: { type: string }
+        symbol: { type: string }
+        side: { type: string, enum: [buy, sell] }
+        quantity: { type: number }
+        limit_price: { type: number }
+        recommendation_id: { type: string }
+    TradeStatus:
+      type: string
+      enum: [pending, approved, executed, rejected, cancelled]
+    AIRecommendationRequest:
+      type: object
+      required: [portfolio_id]
+      properties:
+        portfolio_id: { type: string }
+    RiskAssessment:
+      type: object
+      properties:
+        score: { type: number, minimum: 1, maximum: 10 }
+        label: { type: string }
+        alerts:
+          type: array
+          items:
+            type: object
+            properties:
+              code: { type: string }
+              severity: { type: string }
+              message: { type: string }
+    StreamEvent:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - price.tick
+            - portfolio.update
+            - trade.executed
+            - ai.recommendation
+            - risk.alert
+            - worker.heartbeat
+        data: { type: object }
+        timestamp: { type: string, format: date-time }
