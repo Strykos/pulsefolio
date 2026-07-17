@@ -1,0 +1,180 @@
+name: profitcheck
+
+# Daily Pulsefolio profit watchdog.
+# - Evaluates live portfolio health / P&L
+# - Writes a JSON report artifact (+ commits docs/profitcheck on main)
+# - Opens/updates a GitHub issue on FAIL
+# - Launches the Cursor profitcheck cloud agent when CURSOR_API_KEY is set
+# - Triggers Render redeploy via deploy hook when remediation is needed
+
+on:
+  schedule:
+    # ~09:00 America/New_York during EDT (13:00 UTC)
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+    inputs:
+      force_agent:
+        description: "Launch Cursor profitcheck agent even on PASS"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  profitcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run profitcheck
+        id: check
+        run: |
+          set +e
+          python3 scripts/profitcheck.py --write docs/profitcheck | tee report.json
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          report = json.loads(Path("report.json").read_text())
+          status = report.get("status", "ERROR")
+          flags = ",".join(report.get("remediationFlags") or []) or "none"
+          metrics = report.get("metrics") or {}
+          summary = (
+              f"status={status}; day={metrics.get('dayChangePercent')}%; "
+              f"cash={metrics.get('cashPercent')}%; "
+              f"pending={metrics.get('pendingTrades')}; "
+              f"maxPos={metrics.get('maxPositionSymbol')}@{metrics.get('maxPositionPercent')}%; "
+              f"flags={flags}"
+          )
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"status={status}\n")
+              fh.write(f"flags={flags}\n")
+              fh.write(f"summary={summary}\n")
+          print(summary)
+          PY
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: profitcheck-report
+          path: |
+            report.json
+            docs/profitcheck/latest.json
+            docs/profitcheck/runs/
+
+      - name: Commit report on main
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true
+        run: |
+          git config user.name "profitcheck-bot"
+          git config user.email "profitcheck@users.noreply.github.com"
+          git add docs/profitcheck/latest.json docs/profitcheck/runs
+          if git diff --staged --quiet; then
+            echo "Report unchanged"
+            exit 0
+          fi
+          git commit -m "chore(profitcheck): daily portfolio report"
+          git push origin HEAD:main
+
+      - name: Upsert FAIL issue
+        if: steps.check.outputs.status == 'FAIL'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUMMARY: ${{ steps.check.outputs.summary }}
+          FLAGS: ${{ steps.check.outputs.flags }}
+        run: |
+          title="profitcheck FAIL: remediation required"
+          body=$(cat <<EOF
+          ## profitcheck FAIL
+
+          Automated daily watch detected portfolio issues.
+
+          **Summary:** \`${SUMMARY}\`
+          **Flags:** \`${FLAGS}\`
+
+          Agent brief: \`agents/profitcheck.md\`
+          Latest report: \`docs/profitcheck/latest.json\`
+
+          The profitcheck agent should open a fix PR, merge when CI is green, and verify Render deploy.
+          EOF
+          )
+          existing=$(gh issue list --state open --json number,title --jq ".[] | select(.title==\"$title\") | .number" | head -1 || true)
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh label create profitcheck --color B60205 --description "Daily profitcheck watchdog" 2>/dev/null || true
+            gh issue create --title "$title" --label "profitcheck" --body "$body"
+          fi
+
+      - name: Close FAIL issue on PASS
+        if: steps.check.outputs.status == 'PASS'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="profitcheck FAIL: remediation required"
+          existing=$(gh issue list --state open --json number,title --jq ".[] | select(.title==\"$title\") | .number" | head -1 || true)
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" --comment "profitcheck PASS on $(date -u +%Y-%m-%dT%H:%M:%SZ). Closing."
+          fi
+
+      - name: Trigger Render deploy hook on FAIL
+        if: steps.check.outputs.status == 'FAIL'
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL secret not set — relying on Render GitHub auto-deploy"
+            exit 0
+          fi
+          echo "Kicking Render deploy hook"
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+
+      - name: Launch Cursor profitcheck agent
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          SUMMARY: ${{ steps.check.outputs.summary }}
+          FLAGS: ${{ steps.check.outputs.flags }}
+          STATUS: ${{ steps.check.outputs.status }}
+          FORCE_AGENT: ${{ github.event.inputs.force_agent || 'false' }}
+        run: |
+          if [ -z "$CURSOR_API_KEY" ]; then
+            echo "CURSOR_API_KEY secret not set — skip cloud agent launch"
+            echo "Create a Cursor Automation at https://cursor.com/automations using agents/profitcheck.md"
+            exit 0
+          fi
+          if [ "$STATUS" != "FAIL" ] && [ "$FORCE_AGENT" != "true" ]; then
+            echo "PASS and force_agent=false — skip agent launch"
+            exit 0
+          fi
+          python3 - <<'PY' > payload.json
+          import json, os
+          prompt = f"""You are the Pulsefolio profitcheck agent. Follow agents/profitcheck.md exactly.
+
+          Trigger: GitHub Actions daily profitcheck
+          Status: {os.environ.get('STATUS')}
+          Summary: {os.environ.get('SUMMARY')}
+          Flags: {os.environ.get('FLAGS')}
+
+          Check live production, fix code if FAIL, open PR, merge when CI green, verify Render deploy. Do not wait on a human.
+          """
+          print(json.dumps({
+              "prompt": {"text": prompt},
+              "repos": [{
+                  "url": "https://github.com/Strykos/pulsefolio",
+                  "startingRef": "main",
+              }],
+              "autoCreatePR": True,
+              "name": "profitcheck",
+          }))
+          PY
+          echo "Launching Cursor cloud agent..."
+          curl -fsS --request POST \
+            --url https://api.cursor.com/v1/agents \
+            -u "${CURSOR_API_KEY}:" \
+            --header 'Content-Type: application/json' \
+            --data @payload.json | tee agent-launch.json
