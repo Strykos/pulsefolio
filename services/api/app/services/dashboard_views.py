@@ -332,6 +332,10 @@ def generate_recommendation(
 
     rec = ai_service.generate(db, portfolio, settings.risk_profile)
     log_recommendation(db, user, portfolio, rec)
+    if settings.auto_trade_enabled and rec.action != "HOLD" and rec.symbol:
+        from app.services.auto_trader import _execute_recommendation
+
+        _execute_recommendation(db, portfolio, rec)
     return {
         "success": True,
         "recommendationId": rec.id,

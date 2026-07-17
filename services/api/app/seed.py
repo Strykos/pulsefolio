@@ -30,7 +30,7 @@ def seed_demo_data(db: Session) -> User | None:
     db.add(user)
     db.flush()
 
-    settings = UserSettings(user_id=user.id, auto_trade_enabled=False, risk_profile=RiskProfile.BALANCED)
+    settings = UserSettings(user_id=user.id, auto_trade_enabled=True, risk_profile=RiskProfile.BALANCED)
     db.add(settings)
 
     portfolio = Portfolio(
@@ -71,6 +71,33 @@ def seed_demo_data(db: Session) -> User | None:
     db.commit()
     db.refresh(user)
     return user
+
+
+def ensure_demo_auto_mode(db: Session) -> None:
+    """Enable hands-free auto trading for the demo account (including existing deploys)."""
+    user = db.query(User).filter(User.email == DEMO_EMAIL).first()
+    if not user:
+        return
+
+    settings = db.query(UserSettings).filter(UserSettings.user_id == user.id).first()
+    if settings:
+        settings.auto_trade_enabled = True
+
+    portfolio = db.query(Portfolio).filter(Portfolio.user_id == user.id).first()
+    if portfolio:
+        pending_manual = (
+            db.query(Trade)
+            .filter(
+                Trade.portfolio_id == portfolio.id,
+                Trade.status == TradeStatus.PENDING,
+                Trade.mode == TradeMode.MANUAL,
+            )
+            .all()
+        )
+        for trade in pending_manual:
+            trade.status = TradeStatus.CANCELLED
+
+    db.commit()
 
 
 def ensure_demo_pending_trade(db: Session) -> Trade | None:
