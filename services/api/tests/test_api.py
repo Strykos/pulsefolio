@@ -1,62 +1,8 @@
 from datetime import datetime, timezone
 
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
-from app.auth import hash_password
-from app.database import Base, get_db
-from app.main import app
-from app.models import AIRecommendation, User, UserSettings
+from app.models import AIRecommendation
 from app.services.ai import ai_service
 from app.services.ollama import AIProposal
-
-SQLALCHEMY_DATABASE_URL = "sqlite://"
-
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-@pytest.fixture()
-def db_session():
-    Base.metadata.create_all(bind=engine)
-    session = TestingSessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture()
-def client(db_session):
-    def override_get_db():
-        try:
-            yield db_session
-        finally:
-            pass
-
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
-
-
-@pytest.fixture()
-def auth_headers(client):
-    response = client.post(
-        "/api/v1/auth/register",
-        json={"email": "trader@example.com", "password": "securepass123"},
-    )
-    assert response.status_code == 201
-    token = response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
 
 
 def test_health(client):
@@ -259,6 +205,9 @@ def test_dashboard_endpoints(client, db_session, monkeypatch):
     # recommendation explicitly so this test also covers the approval route.
     monkeypatch.setattr(ai_service, "provider", None)
     client.get("/api/v1/public/dashboard")
+    # Keep manual mode while asserting the active recommendation payload —
+    # auto mode immediately executes and clears ACTIVE recommendations.
+    client.patch("/api/v1/public/settings", json={"mode": "manual"})
     generated = client.post("/api/v1/public/recommendations/generate")
     assert generated.status_code == 200
     assert generated.json()["provider"] == "rules"

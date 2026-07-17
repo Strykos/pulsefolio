@@ -85,16 +85,17 @@ def ensure_demo_auto_mode(db: Session) -> None:
 
     portfolio = db.query(Portfolio).filter(Portfolio.user_id == user.id).first()
     if portfolio:
-        pending_manual = (
+        # Cancel all pending paper trades — manual leftovers and failed auto fills —
+        # so the next auto cycle can sell concentration and restore cash cleanly.
+        pending = (
             db.query(Trade)
             .filter(
                 Trade.portfolio_id == portfolio.id,
                 Trade.status == TradeStatus.PENDING,
-                Trade.mode == TradeMode.MANUAL,
             )
             .all()
         )
-        for trade in pending_manual:
+        for trade in pending:
             trade.status = TradeStatus.CANCELLED
 
     db.commit()
