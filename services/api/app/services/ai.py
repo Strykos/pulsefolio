@@ -17,26 +17,129 @@ from app.services.ollama import (
     OllamaUnavailable,
     RecommendationProvider,
 )
-from app.services.risk import CRYPTO_CAP, MAX_SINGLE_ASSET, compute_risk_assessment
+from app.services.risk import CRYPTO_CAP, MAX_SINGLE_ASSET, MIN_CASH, compute_risk_assessment
 from app.services.simulation import compute_portfolio_state
 
 
-def _largest_drift(portfolio_state: dict, targets: dict[str, float]) -> tuple[str, float, str | None]:
-    total = portfolio_state["total_value"]
-    class_weights: dict[str, float] = {ac.value: 0.0 for ac in AssetClass}
-    class_weights[AssetClass.CASH.value] = (portfolio_state["cash_balance"] / total * 100) if total else 100
+# Prefer higher-expected-return instruments when buying into an underweight class.
+_BUY_PREFERENCE: dict[str, list[str]] = {
+    "stock": ["MSFT", "AAPL"],
+    "etf": ["VTI"],
+    "bond": ["BND"],
+    "crypto": ["BTC", "ETH"],
+    "commodity": ["GLD"],
+}
 
-    symbol_by_class: dict[str, str | None] = {}
-    for row in portfolio_state["positions"]:
+
+def _cash_percent(state: dict) -> float:
+    total = state["total_value"]
+    return (state["cash_balance"] / total * 100) if total else 100.0
+
+
+def _class_weights(state: dict) -> dict[str, float]:
+    total = state["total_value"]
+    weights: dict[str, float] = {ac.value: 0.0 for ac in AssetClass}
+    weights[AssetClass.CASH.value] = _cash_percent(state) if total else 100.0
+    for row in state["positions"]:
         ac = row["position"].asset_class.value
-        class_weights[ac] = class_weights.get(ac, 0.0) + row["weight_percent"]
-        if row["weight_percent"] > 5:
-            symbol_by_class[ac] = row["position"].symbol
+        weights[ac] = weights.get(ac, 0.0) + row["weight_percent"]
+    return weights
+
+
+def _momentum(symbol: str) -> float:
+    try:
+        return float(market_data.get_change_percent(symbol))
+    except Exception:
+        return 0.0
+
+
+def _unrealized_pnl_percent(row: dict) -> float:
+    position = row["position"]
+    cost = position.quantity * position.avg_cost
+    if not cost:
+        return 0.0
+    return ((row["market_value"] - cost) / cost) * 100
+
+
+def _best_buy_symbol(asset_class: str) -> str | None:
+    preferred = _BUY_PREFERENCE.get(asset_class, [])
+    candidates = preferred or [
+        symbol
+        for symbol, meta in SYMBOL_META.items()
+        if meta["asset_class"].value == asset_class and symbol != "CASH"
+    ]
+    if not candidates:
+        return None
+    # Momentum tilt: buy the strongest recent performer in the underweight class.
+    return max(
+        candidates,
+        key=lambda symbol: (
+            _momentum(symbol),
+            -(preferred.index(symbol) if symbol in preferred else 99),
+        ),
+    )
+
+
+def _best_sell_symbol(state: dict, asset_class: str | None = None) -> str | None:
+    rows = [
+        row
+        for row in state["positions"]
+        if row["position"].quantity > 0
+        and (asset_class is None or row["position"].asset_class.value == asset_class)
+    ]
+    if not rows:
+        return None
+    # Trim concentration first; among equals prefer locking in gains.
+    return max(
+        rows,
+        key=lambda row: (row["weight_percent"], _unrealized_pnl_percent(row)),
+    )["position"].symbol
+
+
+def _priority_rebalance(
+    state: dict, targets: dict[str, float]
+) -> tuple[str, float, str | None, str]:
+    """Choose the highest-priority rebalance action for risk-adjusted profits.
+
+    Priority:
+    1. Restore cash floor via sells of the largest / most profitable overweight.
+    2. Trim single-asset concentration.
+    3. Correct the largest allocation drift (sell overweight / buy underweight).
+    """
+    weights = _class_weights(state)
+    cash_pct = weights[AssetClass.CASH.value]
+
+    max_row = max(
+        (row for row in state["positions"] if row["position"].quantity > 0),
+        key=lambda row: row["weight_percent"],
+        default=None,
+    )
+    if max_row and max_row["weight_percent"] > MAX_SINGLE_ASSET:
+        symbol = max_row["position"].symbol
+        asset_class = max_row["position"].asset_class.value
+        excess = max_row["weight_percent"] - MAX_SINGLE_ASSET
+        return asset_class, excess, symbol, "concentration"
+
+    if cash_pct < MIN_CASH:
+        investable = {
+            asset_class: weights.get(asset_class, 0.0) - target
+            for asset_class, target in targets.items()
+            if asset_class != AssetClass.CASH.value
+        }
+        asset_class, drift = max(
+            investable.items(),
+            key=lambda item: item[1],
+            default=(AssetClass.STOCK.value, 0.0),
+        )
+        # Sell enough to refill the cash floor even if classes are near target.
+        needed = MIN_CASH - cash_pct
+        sell_drift = max(drift, needed)
+        symbol = _best_sell_symbol(state, asset_class) or _best_sell_symbol(state)
+        return asset_class, sell_drift, symbol, "cash_floor"
 
     drifts: dict[str, float] = {}
-    for ac, target in targets.items():
-        actual = class_weights.get(ac, 0.0)
-        drifts[ac] = actual - target
+    for asset_class, target in targets.items():
+        drifts[asset_class] = weights.get(asset_class, 0.0) - target
 
     best_class, best_drift = max(
         drifts.items(),
@@ -44,9 +147,6 @@ def _largest_drift(portfolio_state: dict, targets: dict[str, float]) -> tuple[st
         default=("", 0.0),
     )
 
-    # Cash is not directly tradable. Convert cash drift into the most useful
-    # investable correction: buy the most underweight class when cash is high,
-    # or sell the most overweight class when cash is low.
     if best_class == AssetClass.CASH.value:
         investable = {
             asset_class: drift
@@ -66,14 +166,18 @@ def _largest_drift(portfolio_state: dict, targets: dict[str, float]) -> tuple[st
                 default=(best_class, best_drift),
             )
 
-    symbol = symbol_by_class.get(best_class)
-    return best_class, best_drift, symbol
+    if best_drift > 0:
+        symbol = _best_sell_symbol(state, best_class)
+        return best_class, best_drift, symbol, "drift_sell"
+
+    symbol = _best_buy_symbol(best_class)
+    return best_class, best_drift, symbol, "drift_buy"
 
 
 class AIRecommendationService:
     """Hybrid AI recommendations with deterministic portfolio guardrails."""
 
-    PROMPT_VERSION = "portfolio-decision-v1"
+    PROMPT_VERSION = "portfolio-decision-v2"
 
     def __init__(self, provider: RecommendationProvider | None = None) -> None:
         settings = get_settings()
@@ -89,11 +193,14 @@ class AIRecommendationService:
     ) -> AIRecommendation:
         state = compute_portfolio_state(db, portfolio)
         assessment = compute_risk_assessment(state, portfolio.target_allocations, risk_profile)
-        asset_class, drift, symbol = _largest_drift(state, portfolio.target_allocations)
+        asset_class, drift, symbol, reason = _priority_rebalance(
+            state, portfolio.target_allocations
+        )
         allowed_actions, allowed_symbols = self._allowed_candidates(
             state=state,
             asset_class=asset_class,
             drift=drift,
+            reason=reason,
         )
 
         started = perf_counter()
@@ -103,6 +210,7 @@ class AIRecommendationService:
             asset_class=asset_class,
             drift=drift,
             symbol=symbol,
+            reason=reason,
         )
         proposal = rule_proposal
 
@@ -116,6 +224,7 @@ class AIRecommendationService:
                         assessment=assessment,
                         asset_class=asset_class,
                         drift=drift,
+                        reason=reason,
                     ),
                     allowed_actions=allowed_actions,
                     allowed_symbols=allowed_symbols,
@@ -145,10 +254,10 @@ class AIRecommendationService:
         symbol = proposal.symbol
         confidence = proposal.confidence
         rationale = proposal.rationale
-        risk_impact, return_impact = self._impact_for(action, drift)
+        risk_impact, return_impact = self._impact_for(action, drift, reason)
 
         quantity = (
-            self._suggest_quantity(state, symbol, drift, action)
+            self._suggest_quantity(state, symbol, drift, action, reason)
             if symbol and action != "HOLD"
             else None
         )
@@ -174,6 +283,7 @@ class AIRecommendationService:
             "suggestedSymbol": symbol,
             "suggestedQuantity": quantity,
             "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "priorityReason": reason,
             "ai": {
                 "provider": provider_used,
                 "model": self.provider.model if provider_used != "rules" and self.provider else None,
@@ -216,7 +326,31 @@ class AIRecommendationService:
         state: dict,
         asset_class: str,
         drift: float,
+        reason: str,
     ) -> tuple[list[str], list[str]]:
+        cash_pct = _cash_percent(state)
+
+        # Never buy when cash is below the floor — restore liquidity first.
+        if reason in {"cash_floor", "concentration"} or cash_pct < MIN_CASH:
+            symbols = [
+                row["position"].symbol
+                for row in sorted(
+                    state["positions"],
+                    key=lambda row: (row["weight_percent"], _unrealized_pnl_percent(row)),
+                    reverse=True,
+                )
+                if row["position"].quantity > 0
+            ]
+            seen: set[str] = set()
+            ordered: list[str] = []
+            for symbol in symbols:
+                if symbol not in seen:
+                    seen.add(symbol)
+                    ordered.append(symbol)
+            if not ordered:
+                return ["HOLD"], []
+            return ["REBALANCE_SELL"], ordered
+
         if abs(drift) < 3.0:
             return ["HOLD"], []
 
@@ -225,7 +359,7 @@ class AIRecommendationService:
                 row["position"].symbol
                 for row in sorted(
                     state["positions"],
-                    key=lambda row: row["weight_percent"],
+                    key=lambda row: (row["weight_percent"], _unrealized_pnl_percent(row)),
                     reverse=True,
                 )
                 if row["position"].asset_class.value == asset_class
@@ -237,11 +371,18 @@ class AIRecommendationService:
             )
             return actions, symbols
 
-        symbols = [
-            symbol
-            for symbol, meta in SYMBOL_META.items()
-            if meta["asset_class"].value == asset_class and symbol != "CASH"
-        ]
+        symbols = list(
+            dict.fromkeys(
+                (_BUY_PREFERENCE.get(asset_class) or [])
+                + [
+                    symbol
+                    for symbol, meta in SYMBOL_META.items()
+                    if meta["asset_class"].value == asset_class and symbol != "CASH"
+                ]
+            )
+        )
+        # Rank buy candidates by recent momentum for better expected return.
+        symbols = sorted(symbols, key=_momentum, reverse=True)
         actions = (
             ["REBALANCE_BUY"]
             if symbols and abs(drift) >= 10.0
@@ -258,6 +399,7 @@ class AIRecommendationService:
         assessment,
         asset_class: str,
         drift: float,
+        reason: str,
     ) -> dict:
         positions = []
         for row in state["positions"]:
@@ -273,6 +415,7 @@ class AIRecommendationService:
                     "marketValue": round(row["market_value"], 2),
                     "weightPercent": round(row["weight_percent"], 2),
                     "unrealizedPnlPercent": round(pnl_percent, 2),
+                    "dayChangePercent": round(_momentum(position.symbol), 3),
                 }
             )
 
@@ -291,6 +434,7 @@ class AIRecommendationService:
             "largestDrift": {
                 "assetClass": asset_class,
                 "percentagePoints": round(drift, 2),
+                "reason": reason,
             },
             "positions": positions,
             "dataLimitations": [
@@ -321,7 +465,30 @@ class AIRecommendationService:
         asset_class: str,
         drift: float,
         symbol: str | None,
+        reason: str,
     ) -> AIProposal:
+        if reason == "concentration" and symbol:
+            return AIProposal(
+                action="REBALANCE_SELL",
+                symbol=symbol,
+                confidence=0.92,
+                rationale=(
+                    f"{symbol} exceeds the single-asset concentration limit. "
+                    "Trimming the position locks in gains, lowers risk, and frees "
+                    "cash for better-balanced growth."
+                ),
+            )
+        if reason == "cash_floor" and symbol:
+            return AIProposal(
+                action="REBALANCE_SELL",
+                symbol=symbol,
+                confidence=0.9,
+                rationale=(
+                    f"Cash is below the {MIN_CASH:.0f}% floor. Selling {symbol} "
+                    "restores dry powder so the portfolio can buy dips and meet "
+                    "risk guardrails without forced liquidation later."
+                ),
+            )
         if abs(drift) < 3.0:
             return AIProposal(
                 action="HOLD",
@@ -344,14 +511,14 @@ class AIRecommendationService:
                 ),
             )
 
-        default_symbol = {
-            "etf": "VTI",
-            "stock": "AAPL",
-            "bond": "BND",
-            "crypto": "BTC",
-            "commodity": "GLD",
-        }.get(asset_class)
+        default_symbol = symbol or _best_buy_symbol(asset_class)
         if default_symbol:
+            momentum = _momentum(default_symbol)
+            momentum_note = (
+                f" {default_symbol} leads its class today at {momentum:+.2f}%."
+                if momentum
+                else ""
+            )
             return AIProposal(
                 action="REBALANCE_BUY",
                 symbol=default_symbol,
@@ -360,6 +527,7 @@ class AIRecommendationService:
                     f"{asset_class.replace('_', ' ').title()} is underweight by "
                     f"{abs(drift):.1f} percentage points. A measured addition to "
                     f"{default_symbol} would improve target alignment while retaining cash."
+                    f"{momentum_note}"
                 ),
             )
         return AIProposal(
@@ -372,16 +540,26 @@ class AIRecommendationService:
             ),
         )
 
-    def _impact_for(self, action: str, drift: float) -> tuple[float, float]:
+    def _impact_for(self, action: str, drift: float, reason: str) -> tuple[float, float]:
         if action == "REBALANCE_SELL":
-            return (
-                -round(min(0.5, abs(drift) * 0.02), 2),
-                round(-abs(drift) * 0.01, 2),
+            # Concentration / cash-floor sells improve risk and free capital for growth.
+            risk_delta = -round(
+                min(
+                    0.6,
+                    abs(drift) * 0.025
+                    + (0.15 if reason in {"concentration", "cash_floor"} else 0),
+                ),
+                2,
             )
+            return_delta = round(
+                0.02 if reason in {"concentration", "cash_floor"} else -abs(drift) * 0.01,
+                2,
+            )
+            return risk_delta, return_delta
         if action == "REBALANCE_BUY":
             return (
                 round(min(0.3, abs(drift) * 0.015), 2),
-                round(abs(drift) * 0.012, 2),
+                round(abs(drift) * 0.015, 2),
             )
         return 0.0, 0.0
 
@@ -391,6 +569,7 @@ class AIRecommendationService:
         symbol: str | None,
         drift: float,
         action: str,
+        reason: str = "drift",
     ) -> float | None:
         if not symbol:
             return None
@@ -400,8 +579,12 @@ class AIRecommendationService:
             return None
 
         notional = state["total_value"] * (abs(drift) / 100) * 0.5
+        if reason in {"concentration", "cash_floor"}:
+            # Size sells to clear the breach, not a timid half-step.
+            notional = state["total_value"] * (abs(drift) / 100) * 0.85
+
         if action == "REBALANCE_BUY":
-            cash_floor = state["total_value"] * 0.05
+            cash_floor = state["total_value"] * (MIN_CASH / 100)
             available_cash = max(0.0, state["cash_balance"] - cash_floor)
             notional = min(notional, available_cash)
 
@@ -438,7 +621,7 @@ class AIRecommendationService:
             )
             if not position_row:
                 return None
-            notional = min(notional, position_row["market_value"])
+            notional = min(notional, position_row["market_value"] * 0.95)
 
         if notional <= 0 or price <= 0:
             return None

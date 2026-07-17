@@ -97,7 +97,28 @@ class TradeExecutionService:
         )
 
         if mode == TradeMode.AUTO:
-            return self.execute_trade(db, trade=trade, user=user)
+            try:
+                return self.execute_trade(db, trade=trade, user=user)
+            except Exception:
+                # create_trade already committed PENDING; do not leave orphans that
+                # block capital and spam the activity feed on every auto cycle.
+                trade.status = TradeStatus.CANCELLED
+                db.commit()
+                db.refresh(trade)
+                log_decision(
+                    db,
+                    portfolio_id=portfolio.id,
+                    user_id=user.id,
+                    event_type=DecisionEventType.TRADE_REJECTED,
+                    payload={
+                        "trade_id": trade.id,
+                        "reason": "auto_execution_failed",
+                        "symbol": trade.symbol,
+                        "side": trade.side.value,
+                        "quantity": trade.quantity,
+                    },
+                )
+                raise
 
         return trade
 
