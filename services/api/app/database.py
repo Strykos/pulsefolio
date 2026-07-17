@@ -17,8 +17,13 @@ def normalize_database_url(url: str) -> str:
 
 
 database_url = normalize_database_url(settings.database_url)
-connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-engine = create_engine(database_url, connect_args=connect_args)
+if database_url.startswith("sqlite"):
+    connect_args: dict = {"check_same_thread": False}
+elif database_url.startswith("postgresql"):
+    connect_args = {"sslmode": "require"}
+else:
+    connect_args = {}
+engine = create_engine(database_url, connect_args=connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
