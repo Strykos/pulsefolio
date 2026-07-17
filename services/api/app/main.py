@@ -1,3 +1,6 @@
+import asyncio
+import contextlib
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
@@ -10,21 +13,28 @@ from app.routers import settings as settings_router
 from app.schemas import HealthResponse
 from app.services.websocket import hub
 
+logger = logging.getLogger(__name__)
 app_settings = get_settings()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    init_db()
+async def _bootstrap_database() -> None:
+    """Run migrations/seed off the critical path so /health can pass deploy checks."""
     from app.database import SessionLocal
     from app.seed import ensure_demo_pending_trade, seed_demo_data
     from app.services.ai import ai_service
+
+    try:
+        init_db()
+    except Exception:
+        logger.exception("Database initialization failed")
+        return
 
     db = SessionLocal()
     try:
         user = seed_demo_data(db)
         if user:
-            from app.models import Portfolio, AIRecommendation, RecommendationStatus
+            from app.models import AIRecommendation, Portfolio, RecommendationStatus
+
             portfolio = db.query(Portfolio).filter(Portfolio.user_id == user.id).first()
             if portfolio:
                 active = (
@@ -41,10 +51,19 @@ async def lifespan(app: FastAPI):
         db.commit()
     except Exception:
         db.rollback()
+        logger.exception("Demo seed failed")
     finally:
         db.close()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     await hub.start_heartbeat()
+    bootstrap_task = asyncio.create_task(_bootstrap_database())
     yield
+    bootstrap_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await bootstrap_task
 
 
 app = FastAPI(

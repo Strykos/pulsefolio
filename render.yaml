@@ -32,9 +32,10 @@ services:
   - type: web
     name: pulsefolio-web
     runtime: static
+    plan: free
     rootDir: apps/web
-    buildCommand: npm install && npm run build
-    staticPublishPath: out
+    buildCommand: npm ci && npm run build
+    staticPublishPath: apps/web/out
     envVars:
       - key: NODE_VERSION
         value: "20.18.0"
