@@ -1,25 +1,27 @@
 {
   "agent": "profitcheck",
-  "checkedAt": "2026-07-17T12:06:02.025791+00:00",
+  "checkedAt": "2026-07-17T12:04:12.385052+00:00",
   "apiBase": "https://pulsefolio-api.onrender.com",
-  "status": "PASS",
-  "remediationFlags": [],
+  "status": "FAIL",
+  "remediationFlags": [
+    "concentration_breach"
+  ],
   "notes": [],
   "metrics": {
     "health": "ok",
     "totalValue": 166940.0,
-    "dayChange": 1051.39,
-    "dayChangePercent": 0.63,
-    "cashPercent": 23.5,
-    "maxPositionPercent": 24.5,
-    "maxPositionSymbol": "VTI",
+    "dayChange": 1066.01,
+    "dayChangePercent": 0.64,
+    "cashPercent": 22.4,
+    "maxPositionPercent": 25.05,
+    "maxPositionSymbol": "AAPL",
     "pendingTrades": 0,
     "pendingAutoTrades": 0,
     "pendingAny": 0,
     "recommendationAction": null,
     "recommendationAgeSeconds": null,
     "promptVersion": null,
-    "riskScore": 9.2,
+    "riskScore": 9.3,
     "riskLabel": "Aggressive"
   },
   "passCriteria": {
