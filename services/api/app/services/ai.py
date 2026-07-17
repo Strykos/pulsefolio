@@ -579,7 +579,23 @@ class AIRecommendationService:
             return None
 
         notional = state["total_value"] * (abs(drift) / 100) * 0.5
-        if reason in {"concentration", "cash_floor"}:
+        if reason == "concentration":
+            # Clear the breach with a buffer so one cycle lands under the cap.
+            position_row = next(
+                (
+                    row
+                    for row in state["positions"]
+                    if row["position"].symbol == symbol
+                ),
+                None,
+            )
+            if position_row:
+                target_weight = MAX_SINGLE_ASSET - 0.5
+                sell_weight = max(0.0, position_row["weight_percent"] - target_weight)
+                notional = state["total_value"] * (sell_weight / 100.0)
+            else:
+                notional = state["total_value"] * (abs(drift) / 100) * 1.0
+        elif reason == "cash_floor":
             # Size sells to clear the breach, not a timid half-step.
             notional = state["total_value"] * (abs(drift) / 100) * 0.85
 

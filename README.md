@@ -89,4 +89,8 @@ See [docs/architecture/cloud-provisioning.md](docs/architecture/cloud-provisioni
 - iOS + web clients
 
 ## Agent workflow
-See `agents/` for PM, Architect, Developer, Tester, CI/CD prompt templates.
+See `agents/` for PM, Architect, Developer, Tester, CI/CD, and **profitcheck** prompt templates.
+
+**profitcheck** runs daily (`0 13 * * *` UTC) via `.github/workflows/profitcheck.yml`:
+measures live P&L, opens issues on FAIL, and can launch a Cursor cloud agent to
+fix/merge/deploy. Setup notes: `docs/agents/profitcheck-automation.md`.

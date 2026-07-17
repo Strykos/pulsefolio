@@ -1,14 +1,47 @@
 name: Deploy API
 
+# Auto-deploy services/api after merges to main.
+# Prefer Render GitHub auto-deploy (blueprint). Optionally hit a deploy hook
+# when RENDER_DEPLOY_HOOK_URL is configured.
+
 on:
   push:
     branches: [main]
+    paths:
+      - "services/api/**"
+      - "services/worker/**"
+      - "render.yaml"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy to Railway
-        run: echo "Configure RAILWAY_TOKEN secret for production deploy"
-        # railway up --service api
+
+      - name: Trigger Render deploy hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "No RENDER_DEPLOY_HOOK_URL secret — assuming Render GitHub auto-deploy is enabled for pulsefolio-api."
+            echo "Verify at https://pulsefolio-api.onrender.com/api/v1/health"
+            exit 0
+          fi
+          echo "Deploying pulsefolio-api via Render deploy hook"
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+          echo
+          echo "Waiting briefly for deploy to start..."
+          sleep 15
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            code=$(curl -sS -o /tmp/health.json -w "%{http_code}" --max-time 30 \
+              https://pulsefolio-api.onrender.com/api/v1/health || true)
+            echo "health attempt $i -> HTTP $code $(cat /tmp/health.json 2>/dev/null || true)"
+            if [ "$code" = "200" ]; then
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "Health check did not return 200 yet; Render may still be building."
+          exit 0

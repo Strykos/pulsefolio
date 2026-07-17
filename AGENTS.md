@@ -21,10 +21,19 @@ Approved mockups: `docs/mockups/` or `.cursor/projects/.../assets/`.
 
 | Agent | File | Gate |
 |-------|------|------|
+| **profitcheck** | `agents/profitcheck.md` | Daily P&L watch → fix → merge → verify deploy |
 | PM | `agents/project-manager.md` | Story approved before dev |
 | Architect | `agents/senior-architect.md` | Spec before implementation |
 | Developer | `agents/senior-developer.md` | One story per PR |
 | Tester | `agents/tester.md` | TR-xxx before merge |
 | CI/CD | `agents/cicd-specialist.md` | Green CI |
+
+## profitcheck (daily)
+
+- Schedule: GitHub Actions `.github/workflows/profitcheck.yml` cron `0 13 * * *` UTC
+- Checker: `python3 scripts/profitcheck.py`
+- Reports: `docs/profitcheck/latest.json`
+- Cursor Automation setup: `docs/agents/profitcheck-automation.md`
+- On FAIL: open issue, launch cloud agent (if `CURSOR_API_KEY`), fix auto-trader/AI, merge, confirm Render
 
 See `docs/agent-workflow-log.md` for execution log and release gates.
