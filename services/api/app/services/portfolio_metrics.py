@@ -21,7 +21,10 @@ def portfolio_sparkline(state: dict, points: int = 48) -> list[float]:
         return [round(state["total_value"], 2)] * points
 
     histories = {row["position"].symbol.upper(): market_data_service.get_history(row["position"].symbol) for row in rows}
-    min_len = min(len(values) for values in histories.values() if values)
+    lengths = [len(values) for values in histories.values() if values]
+    if not lengths:
+        return [round(state["total_value"], 2)] * points
+    min_len = min(lengths)
     if min_len < 2:
         return [round(state["total_value"], 2)] * points
 

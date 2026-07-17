@@ -8,7 +8,10 @@ import { api } from "@/lib/api";
 import type { DashboardData, PortfolioData } from "@/lib/types";
 import { useWebSocketContext } from "@/providers/WebSocketProvider";
 
+import { useAuth } from "@/providers/AuthProvider";
+
 export default function DashboardPage() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -31,13 +34,26 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
     load();
-  }, [load]);
+  }, [load, authLoading, isAuthenticated]);
+
+  if (authLoading) {
+    return (
+      <AppShell title="Briefing" variant="observatory">
+        <PageBanner kind="demo">Loading session…</PageBanner>
+      </AppShell>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   if (!data || !portfolio) {
     return (
       <AppShell title="Briefing" variant="observatory">
-        <PageBanner kind="demo">
+        <PageBanner kind={loadError ? "error" : "demo"}>
           {loadError ?? "Connecting to live portfolio API…"}
         </PageBanner>
       </AppShell>

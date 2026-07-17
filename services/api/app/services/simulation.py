@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import AssetClass, CashLedgerEntry, Portfolio, Position
-from app.services.market_data import market_data
+from app.services.market_data import market_data, MarketDataUnavailable
 
 settings = get_settings()
 
@@ -54,7 +54,7 @@ def compute_portfolio_state(db: Session, portfolio: Portfolio) -> dict:
             continue
         try:
             price = market_data.get_price(pos.symbol)
-        except ValueError:
+        except (ValueError, MarketDataUnavailable):
             price = pos.avg_cost
         market_value = pos.quantity * price
         cost = pos.quantity * pos.avg_cost
