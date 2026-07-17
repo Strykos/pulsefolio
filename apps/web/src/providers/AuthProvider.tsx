@@ -25,6 +25,13 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const PUBLIC_PATHS = ["/login"];
 
+function normalizePath(path: string): string {
+  if (path.length > 1 && path.endsWith("/")) {
+    return path.slice(0, -1);
+  }
+  return path;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,11 +46,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoading) return;
-    const isPublic = PUBLIC_PATHS.includes(pathname);
+    const path = normalizePath(pathname);
+    const isPublic = PUBLIC_PATHS.includes(path);
     if (!token && !isPublic) {
-      router.replace("/login");
-    } else if (token && pathname === "/login") {
-      router.replace("/dashboard");
+      router.replace("/login/");
+    } else if (token && path === "/login") {
+      router.replace("/dashboard/");
     }
   }, [token, pathname, isLoading, router]);
 
@@ -70,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     setToken(null);
-    router.replace("/login");
+    router.replace("/login/");
   }, [router]);
 
   const value = useMemo(

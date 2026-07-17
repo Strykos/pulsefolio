@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/providers/AuthProvider";
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const router = useRouter();
   const [email, setEmail] = useState("demo@pulsefolio.app");
   const [password, setPassword] = useState("demo12345");
   const [error, setError] = useState<string | null>(null);
@@ -19,6 +21,8 @@ export default function LoginPage() {
     const result = await login(email, password);
     if (!result.success) {
       setError(result.error ?? "Login failed");
+    } else {
+      router.replace("/dashboard/");
     }
     setIsSubmitting(false);
   };
