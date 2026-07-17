@@ -1,0 +1,8 @@
+services/api/.venv
+services/api/.pytest_cache
+**/.next
+**/node_modules
+apps/ios
+.tmp
+.tools
+*.db

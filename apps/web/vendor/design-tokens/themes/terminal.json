@@ -1,0 +1,18 @@
+{
+  "id": "terminal",
+  "name": "Terminal",
+  "mood": "Retro trader, high contrast",
+  "colors": {
+    "bg": "#000000",
+    "surface": "#0A0A0A",
+    "surfaceElevated": "#141414",
+    "textPrimary": "#00FF41",
+    "textMuted": "#00AA2A",
+    "gain": "#00FF41",
+    "loss": "#FF3333",
+    "accent": "#00FF41",
+    "pulseGlow": "rgba(0, 255, 65, 0.25)",
+    "chartGrid": "#1A1A1A",
+    "cardBorder": "#1F1F1F"
+  }
+}

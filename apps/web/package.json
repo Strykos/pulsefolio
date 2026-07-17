@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000",
+    "sync-tokens": "node scripts/copy-design-tokens.mjs",
     "build": "next build",
+    "dev": "npm run sync-tokens && next dev --port 3000",
     "start": "next start -H 0.0.0.0",
     "lint": "next lint"
   },

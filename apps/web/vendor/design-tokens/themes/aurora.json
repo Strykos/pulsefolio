@@ -1,0 +1,18 @@
+{
+  "id": "aurora",
+  "name": "Aurora",
+  "mood": "Energetic, optimistic",
+  "colors": {
+    "bg": "#0A1628",
+    "surface": "#132238",
+    "surfaceElevated": "#1C3050",
+    "textPrimary": "#FFFFFF",
+    "textMuted": "#8BA4C4",
+    "gain": "#00E5C0",
+    "loss": "#FF6B7A",
+    "accent": "#8B5CF6",
+    "pulseGlow": "rgba(139, 92, 246, 0.35)",
+    "chartGrid": "#1E3355",
+    "cardBorder": "#243B5C"
+  }
+}
