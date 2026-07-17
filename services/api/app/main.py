@@ -38,6 +38,9 @@ async def lifespan(app: FastAPI):
                 if not active:
                     ai_service.generate(db, portfolio)
         ensure_demo_pending_trade(db)
+        db.commit()
+    except Exception:
+        db.rollback()
     finally:
         db.close()
     await hub.start_heartbeat()

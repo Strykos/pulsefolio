@@ -1,5 +1,4 @@
 # Render Blueprint — Pulsefolio (free tier)
-# Dashboard → New → Blueprint → connect GitHub repo → apply.
 
 databases:
   - name: pulsefolio-db
@@ -13,7 +12,7 @@ services:
     runtime: python
     plan: free
     rootDir: services/api
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/v1/health
     envVars:
@@ -32,15 +31,11 @@ services:
 
   - type: web
     name: pulsefolio-web
-    runtime: node
-    plan: free
+    runtime: static
     rootDir: apps/web
     buildCommand: npm install && npm run build
-    startCommand: npm start
-    healthCheckPath: /login
+    staticPublishPath: out
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: NODE_VERSION
         value: "20.18.0"
       - key: NODE_OPTIONS
